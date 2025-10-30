@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BTC • Halving-Cycle Dashboard (PWA • Auto)</title>
+<meta name="theme-color" content="#0A0C10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--bg:#0A0C10;--card:#12141A;--muted:#9AA3AD;--fg:#EDF2F6;--accent:#5AD0FF;--radius:14px}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#07080a 0%, #0d1116 100%);font-family:Inter, system-ui, "DejaVu Sans", Arial, sans-serif;color:var(--fg)}
+  .wrap{max-width:980px;margin:18px auto;padding:18px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0}
+  header p{margin:0;color:var(--muted);font-size:13px}
+  .sep{height:2px;background:linear-gradient(90deg,var(--accent), rgba(90,208,255,0.12));border-radius:6px;margin:14px 0}
+  .grid{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:900px){ .grid{grid-template-columns:1fr 1fr} }
+  .card{background:var(--card);padding:18px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,12,0.7);border:1px solid rgba(255,255,255,0.03)}
+  .card h2{margin:0 0 8px 0;font-size:16px}
+  .value{font-weight:700;font-size:34px;margin:6px 0}
+  .note{color:var(--muted);font-size:13px;line-height:1.4;margin-top:8px}
+  .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:9px;color:var(--fg);cursor:pointer;font-weight:600;font-size:13px}
+  .btn.accent{border-color:var(--accent);box-shadow:0 4px 16px rgba(90,208,255,0.08)}
+  .pill{background:#0f1114;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.06);font-size:12px;color:var(--muted)}
+  footer{color:var(--muted);font-size:13px;padding:12px 6px;text-align:left;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>BTC • Halving-Cycle Dashboard</h1>
+      <p>Auto-values μέσω serverless · dark mode · PWA</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="pill" id="ts">—</div>
+      <button class="btn" id="installBtn" style="display:none">Εγκατάσταση</button>
+      <button class="btn" id="openAll">Άνοιξε όλα</button>
+    </div>
+  </header>
+
+  <div class="sep"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Hashrate (7-day avg)</h2>
+      <div class="value" id="hashVal">—</div>
+      <div class="note small" id="hashMeta" style="color:#9AA3AD">Πηγή: blockchain.com</div>
+      <div class="links"><button class="btn" onclick="openNew('https://bitinfocharts.com/bitcoin/hashrate.html')">Άνοιξε πηγή</button></div>
+    </div>
+    <div class="card">
+      <h2>Funding (BTCUSDT perp)</h2>
+      <div class="value" id="fundVal">—</div>
+      <div class="note small" id="fundMeta" style="color:#9AA3AD">Πηγή: Binance</div>
+      <div class="links"><button class="btn" onclick="openNew('https://coinglass.com/FundingRate')">Άνοιξε πίνακα</button></div>
+    </div>
+    <div class="card">
+      <h2>Miner Outflows (ημέρα)</h2>
+      <div class="value" id="minerVal">—</div>
+      <div class="note small" id="minerMeta" style="color:#9AA3AD">Πηγή: CryptoQuant (αν έχεις API key)</div>
+      <div class="links"><button class="btn" onclick="openNew('https://cryptoquant.com/asset/btc/miner-outflow')">Άνοιξε πίνακα</button></div>
+    </div>
+  </div>
+
+  <footer>Offline: UI μόνο. Auto-values χρειάζονται δίκτυο (και CQ_API_KEY για outflows).</footer>
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+  let deferredPrompt;
+  const installBtn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installBtn.style.display = 'inline-block'; });
+  installBtn?.addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.style.display = 'none'; });
+
+  const tsEl = document.getElementById('ts');
+  function setTs(){ tsEl.textContent = new Date().toLocaleString(); }
+  setTs(); setInterval(setTs, 60*1000);
+  function openNew(url){ window.open(url,'_blank','noopener'); }
+
+  async function loadHashrate(){ try { const r = await fetch('/.netlify/functions/hashrate'); const j = await r.json(); if (j.value!=null){ document.getElementById('hashVal').textContent = j.value.toFixed(2)+' EH/s'; document.getElementById('hashMeta').textContent = 'Πηγή: '+j.source; } } catch(e){ document.getElementById('hashVal').textContent='offline'; } }
+  async function loadFunding(){ try { const r = await fetch('/.netlify/functions/funding'); const j = await r.json(); if (j.value!=null){ document.getElementById('fundVal').textContent = (Number(j.value)*100).toFixed(4)+'%'; document.getElementById('fundMeta').textContent = 'Πηγή: '+j.exchange+' '+j.symbol; } } catch(e){ document.getElementById('fundVal').textContent='offline'; } }
+  async function loadMiner(){ try { const r = await fetch('/.netlify/functions/miner_outflows'); const j = await r.json(); if (j.value!=null){ document.getElementById('minerVal').textContent = Number(j.value).toFixed(0)+' BTC/ημ.'; document.getElementById('minerMeta').textContent = 'Πηγή: '+(j.source||'CryptoQuant'); } else if (j.note){ document.getElementById('minerMeta').textContent = j.note; } } catch(e){ document.getElementById('minerVal').textContent='offline'; } }
+  function refreshAll(){ loadHashrate(); loadFunding(); loadMiner(); }
+  refreshAll(); setInterval(refreshAll, 10*60*1000);
+  document.getElementById('openAll').addEventListener('click', ()=>['https://bitinfocharts.com/bitcoin/hashrate.html','https://cryptoquant.com/asset/btc/miner-outflow','https://coinglass.com/FundingRate'].forEach(openNew));
+</script>
+</body>
+</html>
